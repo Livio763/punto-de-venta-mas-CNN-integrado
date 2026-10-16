@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, field_validator
 from .db import connection, initialize
+from .fotos import router as fotos_router
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,7 +15,8 @@ async def lifespan(app: FastAPI):
     initialize()
     yield
 
-app = FastAPI(title="Punto Verde Store", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Punto Verde Store", version="0.2.0", lifespan=lifespan)
+app.include_router(fotos_router)
 
 class NuevoProducto(BaseModel):
     nombre: str = Field(min_length=1, max_length=120)
