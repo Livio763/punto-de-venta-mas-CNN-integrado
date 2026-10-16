@@ -26,3 +26,20 @@ Crear producto con precio (Bs) y stock inicial; buscar y vender por nombre; suma
 ## Próxima fase CNN
 
 Reutilizar la arquitectura convolucional original de `entrenar.py`, sustituyendo clases de residuos por IDs estables de productos. Capturar fotografías etiquetadas en múltiples sesiones; mantener entrenamiento/validación/prueba separados por sesión; entrenar, evaluar por clase y publicar un modelo versionado solo si supera criterios de aceptación. La inferencia nunca debe registrar una venta sin confirmación humana. Los productos nuevos son vendibles manualmente hasta el siguiente entrenamiento validado.
+
+## Fase 2: fotos etiquetadas por producto
+
+En **Productos** guarda el artículo, selecciónalo, escribe un identificador de sesión (por ejemplo, `dia1_frente`) y usa **Encender cámara → Tomar fotografía**, o sube archivos JPEG/PNG/WebP desde el teléfono. Para acceso desde otro dispositivo, la cámara requiere un contexto seguro HTTPS (o localhost).
+
+La API almacena JPEG normalizados bajo `datos/fotos/producto_000001/<sesion>/<hash>.jpg` y guarda referencias en SQLite; verifica tipo, tamaño máximo de 6 MB, dimensiones y duplicados dentro de una sesión.
+
+Endpoints:
+- `POST /api/productos/{id}/fotos` con multipart `archivo` + `sesion`
+- `GET /api/productos/{id}/fotos`
+- `GET /api/fotos/{foto_id}`
+- `GET /api/dataset/resumen`
+- `GET /api/dataset/manifiesto`
+
+El manifiesto ofrece rutas, IDs de producto y sesiones para una próxima fase de entrenamiento. **No entrena automáticamente** al cargar fotografías. Captura varias sesiones reales por producto con luz, fondos y ángulos diferentes. No mezclar imágenes de una misma sesión entre train/validación/test. La cámara no ejecuta reconocimiento todavía.
+
+Pruebas de esta fase: `python -m unittest discover -s tests -v`.
