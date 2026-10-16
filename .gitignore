@@ -53,3 +53,10 @@ desktop.ini
 datos/dataset/
 datos/fotos/
 datos/*.db-*
+
+# Fuentes externas, imágenes preparadas y respaldos locales
+datos/externos/
+datos/dataset_preparado/
+respaldos_locales/
+*.zip
+.env
