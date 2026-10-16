@@ -2,7 +2,7 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Punto Verde Store</title>
 <style>
-:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}body{background:#0f172a;color:#e2e8f0;margin:0}main{max-width:620px;margin:auto;padding:18px}header{background:#102e2a;padding:18px;text-align:center}h1{margin:0}section{background:#1e293b;border-radius:14px;padding:16px;margin:14px 0}input,button,select{font:inherit;border-radius:9px;padding:12px;box-sizing:border-box}input{background:#0f172a;color:white;border:1px solid #64748b;width:100%;margin:5px 0 12px}button{background:#10b981;border:0;color:#062b20;font-weight:700;cursor:pointer;margin:3px}button.secondary{background:#334155;color:white}.actions{display:flex;flex-wrap:wrap}.hidden{display:none}nav{display:flex;justify-content:center;flex-wrap:wrap}.item{border-bottom:1px solid #475569;padding:12px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}.muted{color:#94a3b8;font-size:.9em}#status{min-height:22px;padding:8px}button:disabled{opacity:.5}video{width:100%;border-radius:12px}
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}body{background:#0f172a;color:#e2e8f0;margin:0}main{max-width:620px;margin:auto;padding:18px}header{background:#102e2a;padding:18px;text-align:center}h1{margin:0}section{background:#1e293b;border-radius:14px;padding:16px;margin:14px 0}input,button,select{font:inherit;border-radius:9px;padding:12px;box-sizing:border-box}input{background:#0f172a;color:white;border:1px solid #64748b;width:100%;margin:5px 0 12px}button{background:#10b981;border:0;color:#062b20;font-weight:700;cursor:pointer;margin:3px}button.secondary{background:#334155;color:white}.actions{display:flex;flex-wrap:wrap}.hidden{display:none}nav{display:flex;justify-content:center;flex-wrap:wrap}.item{border-bottom:1px solid #475569;padding:12px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}.muted{color:#94a3b8;font-size:.9em}#status{min-height:22px;padding:8px}button:disabled{opacity:.5}video{width:100%;border-radius:12px}.photo-actions{display:flex;flex-wrap:wrap;gap:6px}.thumbs{display:flex;gap:8px;overflow-x:auto;margin:10px 0}.thumbs img{width:90px;height:90px;object-fit:cover;border-radius:8px}.tag{display:inline-block;background:#0e7490;color:white;border-radius:8px;padding:4px 8px;font-size:.8em}
 </style></head>
 <body><header><h1>🛒 Punto Verde Store</h1><span>Registradora local · Bs · Sin usuarios</span></header><main>
 <nav><button onclick="show('venta')">Vender</button><button onclick="show('productos')">Productos</button><button onclick="show('historial')">Historial</button></nav>
@@ -14,7 +14,21 @@
 <label>Precio (Bs)<input name="precio" type="number" min="0" step="0.01" required></label>
 <label>Stock inicial<input name="stock" type="number" min="0" step="1" value="0" required></label>
 <label>Umbral stock bajo<input name="umbral_stock" type="number" min="0" step="1" value="3" required></label>
-<button type="submit">Guardar producto</button></form><h3>Inventario</h3><div id="lista-productos"></div></section>
+<button type="submit">Guardar producto</button></form>
+<h3>Fotografías para entrenar la CNN</h3>
+<p class="muted">Primero guarda el producto y luego selecciónalo. Captura diferentes caras, ángulos y fondos. Cada sesión debe representar una nueva ronda de fotografías.</p>
+<label>Producto<select id="foto-producto" aria-label="Producto para fotografías"></select></label>
+<label>Sesión de captura<input id="foto-sesion" maxlength="48" placeholder="ej. sesion_20261016_a"></label>
+<div class="photo-actions">
+<button class="secondary" type="button" onclick="activarCamara()">Encender cámara</button>
+<button type="button" onclick="capturarFoto()">Tomar fotografía</button>
+</div>
+<video id="camara-registro" autoplay muted playsinline class="hidden"></video>
+<label>O subir fotografías desde el dispositivo<input id="subir-foto" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+<button class="secondary" type="button" onclick="subirArchivos()">Subir imágenes</button>
+<p id="contador-fotos" class="muted">Selecciona un producto para ver sus fotografías.</p>
+<div id="miniaturas" class="thumbs"></div>
+<h3>Inventario</h3><div id="lista-productos"></div></section>
 <section id="historial" class="hidden"><h2>Ventas</h2><div id="resumen"></div><div id="lista-historial"></div></section>
 </main><script>
 let catalogo=[];
@@ -27,11 +41,64 @@ async function refresh(){try{catalogo=await api('productos');renderVenta();rende
 function label(s){let x=document.createElement('span');x.textContent=s;return x}
 function makeButton(text,fn){let b=document.createElement('button');b.textContent=text;b.onclick=fn;return b}
 function renderVenta(){let q=$('buscar').value.toLocaleLowerCase();$('lista-venta').replaceChildren(...catalogo.filter(p=>p.nombre.toLocaleLowerCase().includes(q)).map(p=>{let row=document.createElement('div');row.className='item';row.append(label(p.nombre+' · '+fmt(p.precio)+' · Stock: '+p.stock),makeButton('Vender',()=>vender(p)));return row}))}
-function renderProductos(){$('lista-productos').replaceChildren(...catalogo.map(p=>{let row=document.createElement('div');row.className='item';row.append(label(p.nombre+' · '+fmt(p.precio)+' · '+p.stock+' unidades'+(p.stock_bajo?' ⚠️':'')),makeButton('+ Stock',()=>stock(p)));return row}))}
+function renderProductos(){
+let select=$('foto-producto'),old=select.value;
+select.replaceChildren(...catalogo.map(p=>{let o=document.createElement('option');o.value=p.id;o.textContent=p.nombre;return o}));
+if(catalogo.some(p=>String(p.id)===old))select.value=old;
+listarFotos();
+$(''lista-productos').replaceChildren(...catalogo.map(p=>{let row=document.createElement('div');row.className='item';row.append(label(p.nombre+' · '+fmt(p.precio)+' · '+p.stock+' unidades'+(p.stock_bajo?' ⚠️':'')),makeButton('+ Stock',()=>stock(p)));return row}))}
 async function vender(p){let c=prompt('Cantidad a vender de '+p.nombre,1);if(c===null)return;let n=Number(c);if(!Number.isSafeInteger(n)||n<1)return status('Cantidad inválida',true);if(!confirm('Vender '+n+' × '+p.nombre+' por '+fmt(n*Number(p.precio))+'?'))return;try{let r=await api('ventas',{method:'POST',body:JSON.stringify({producto_id:p.id,cantidad:n})});status('Venta #'+r.id+' registrada por '+fmt(r.total));await refresh()}catch(e){status(e.message,true)}}
 async function stock(p){let c=prompt('Unidades a agregar a '+p.nombre,1);if(c===null)return;let n=Number(c);if(!Number.isSafeInteger(n)||n<1)return status('Cantidad inválida',true);try{await api('productos/'+p.id+'/stock',{method:'POST',body:JSON.stringify({cantidad:n})});status('Stock actualizado');await refresh()}catch(e){status(e.message,true)}}
-$('form-producto').onsubmit=async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));data.stock=Number(data.stock);data.umbral_stock=Number(data.umbral_stock);try{await api('productos',{method:'POST',body:JSON.stringify(data)});e.target.reset();status('Producto registrado');await refresh()}catch(err){status(err.message,true)}};
-async function activarCamara(){try{let s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});$('camara').srcObject=s;$('camara').classList.remove('hidden');status('Cámara activa. Reconocimiento CNN aún no disponible.')}catch(e){status('No se pudo activar la cámara: '+e.message,true)}}
+$('form-producto').onsubmit=async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));data.stock=Number(data.stock);data.umbral_stock=Number(data.umbral_stock);try{let nuevo=await api('productos',{method:'POST',body:JSON.stringify(data)});e.target.reset();status('Producto registrado. Ya puedes añadir fotografías.');await refresh();$('foto-producto').value=String(nuevo.id);listarFotos()}catch(err){status(err.message,true)}};
+async function activarCamara(){try{let s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});for(let id of ['camara','camara-registro']){let v=$(id);v.srcObject=s;v.classList.remove('hidden')}status('Cámara activa. Puedes tomar fotografías para el dataset.')}catch(e){status('No se pudo activar la cámara: '+e.message,true)}}
 function avisoCNN(){status('La CNN se integrará tras entrenar y validar el dataset de productos.',true)}
+
+function sesionActual(){
+let s=$('foto-sesion').value.trim();
+if(!/^[a-zA-Z0-9_-]{1,48}$/.test(s))throw Error('Escribe una sesión válida (letras, números, _ o -).');
+return s;
+}
+async function subirImagen(file){
+let pid=Number($('foto-producto').value);
+if(!pid)throw Error('Primero registra y selecciona un producto.');
+let fd=new FormData();
+fd.append('archivo',file,file.name||'captura.jpg');
+fd.append('sesion',sesionActual());
+let res=await fetch('/api/productos/'+pid+'/fotos',{method:'POST',body:fd});
+let json=await res.json();
+if(!res.ok)throw Error(typeof json.detail==='string'?json.detail:'No se pudo subir la fotografía');
+return json;
+}
+async function subirArchivos(){
+let files=[...$('subir-foto').files];
+if(!files.length)return status('Selecciona al menos una fotografía.',true);
+let ok=0,errores=[];
+for(let file of files){try{await subirImagen(file);ok++}catch(e){errores.push(e.message)}}
+$('subir-foto').value='';
+status(ok+' fotos guardadas'+(errores.length?'; '+errores.length+' errores: '+errores[0]:''),!!errores.length);
+await listarFotos();
+}
+async function capturarFoto(){
+let v=$('camara-registro');
+if(!v.srcObject||!v.videoWidth)return status('Primero enciende la cámara y selecciona un producto.',true);
+let canvas=document.createElement('canvas');canvas.width=v.videoWidth;canvas.height=v.videoHeight;
+canvas.getContext('2d').drawImage(v,0,0);
+canvas.toBlob(async blob=>{
+if(!blob)return status('Error al capturar la imagen',true);
+try{await subirImagen(new File([blob],'captura.jpg',{type:'image/jpeg'}));status('Fotografía capturada y guardada');await listarFotos()}
+catch(e){status(e.message,true)}
+},'image/jpeg',0.9);
+}
+async function listarFotos(){
+let id=$('foto-producto').value;
+if(!id){$('contador-fotos').textContent='Registra un producto para añadir fotografías.';$('miniaturas').replaceChildren();return}
+try{
+let fotos=await api('productos/'+id+'/fotos');
+$('contador-fotos').textContent=fotos.length+' fotos guardadas para este producto. Estado CNN: pendiente de entrenamiento.';
+$('miniaturas').replaceChildren(...fotos.map(f=>{let img=document.createElement('img');img.src=f.url;img.alt='Foto sesión '+f.sesion;img.loading='lazy';img.title=f.sesion;return img}))
+}catch(e){status(e.message,true)}
+}
+$('foto-producto').onchange=listarFotos;
+
 refresh();
 </script></body></html>
