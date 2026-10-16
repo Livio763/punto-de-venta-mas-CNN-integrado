@@ -48,3 +48,15 @@ desktop.ini
 # modelo_web/model.json
 # modelo_web/clases.json
 # modelo_web/LEEME.txt
+
+# Dataset capturado para la CNN
+datos/dataset/
+datos/fotos/
+datos/*.db-*
+
+# Fuentes externas, imágenes preparadas y respaldos locales
+datos/externos/
+datos/dataset_preparado/
+respaldos_locales/
+*.zip
+.env
