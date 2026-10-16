@@ -48,3 +48,8 @@ desktop.ini
 # modelo_web/model.json
 # modelo_web/clases.json
 # modelo_web/LEEME.txt
+
+# Dataset capturado para la CNN
+datos/dataset/
+datos/fotos/
+datos/*.db-*
