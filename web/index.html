@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Punto Verde Store</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}body{background:#0f172a;color:#e2e8f0;margin:0}main{max-width:620px;margin:auto;padding:18px}header{background:#102e2a;padding:18px;text-align:center}h1{margin:0}section{background:#1e293b;border-radius:14px;padding:16px;margin:14px 0}input,button,select{font:inherit;border-radius:9px;padding:12px;box-sizing:border-box}input{background:#0f172a;color:white;border:1px solid #64748b;width:100%;margin:5px 0 12px}button{background:#10b981;border:0;color:#062b20;font-weight:700;cursor:pointer;margin:3px}button.secondary{background:#334155;color:white}.actions{display:flex;flex-wrap:wrap}.hidden{display:none}nav{display:flex;justify-content:center;flex-wrap:wrap}.item{border-bottom:1px solid #475569;padding:12px 0;display:flex;justify-content:space-between;gap:8px;align-items:center}.muted{color:#94a3b8;font-size:.9em}#status{min-height:22px;padding:8px}button:disabled{opacity:.5}video{width:100%;border-radius:12px}
+</style></head>
+<body><header><h1>🛒 Punto Verde Store</h1><span>Registradora local · Bs · Sin usuarios</span></header><main>
+<nav><button onclick="show('venta')">Vender</button><button onclick="show('productos')">Productos</button><button onclick="show('historial')">Historial</button></nav>
+<div id="status" role="status" aria-live="polite"></div>
+<section id="venta"><h2>Venta rápida</h2><p class="muted">Busca un producto y confirma la venta. Reconocimiento CNN en preparación.</p><input id="buscar" placeholder="Buscar producto por nombre" oninput="renderVenta()"><div id="lista-venta"></div>
+<h3>Cámara (preparada para CNN)</h3><video id="camara" autoplay muted playsinline class="hidden"></video><div class="actions"><button class="secondary" onclick="activarCamara()">Activar cámara</button><button class="secondary" onclick="avisoCNN()">Reconocer producto</button></div></section>
+<section id="productos" class="hidden"><h2>Nuevo producto</h2><form id="form-producto">
+<label>Nombre<input name="nombre" required maxlength="120"></label><label>Categoría<input name="categoria" maxlength="80"></label>
+<label>Precio (Bs)<input name="precio" type="number" min="0" step="0.01" required></label>
+<label>Stock inicial<input name="stock" type="number" min="0" step="1" value="0" required></label>
+<label>Umbral stock bajo<input name="umbral_stock" type="number" min="0" step="1" value="3" required></label>
+<button type="submit">Guardar producto</button></form><h3>Inventario</h3><div id="lista-productos"></div></section>
+<section id="historial" class="hidden"><h2>Ventas</h2><div id="resumen"></div><div id="lista-historial"></div></section>
+</main><script>
+let catalogo=[];
+const $=id=>document.getElementById(id);
+const fmt=x=>'Bs '+Number(x).toFixed(2);
+function status(m,error=false){$('status').textContent=m;$('status').style.color=error?'#fca5a5':'#86efac'}
+function show(id){for(const s of ['venta','productos','historial'])$(s).classList.toggle('hidden',s!==id);refresh()}
+async function api(path,options={}){const r=await fetch('/api/'+path,{headers:{'Content-Type':'application/json'},...options});let d=await r.json();if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:'No se pudo completar la operación');return d}
+async function refresh(){try{catalogo=await api('productos');renderVenta();renderProductos();let h=await api('ventas'),res=await api('resumen');$('resumen').textContent='Hoy: '+res.ventas_hoy+' ventas · '+fmt(res.total_hoy)+' · '+res.stock_bajo+' productos con stock bajo';$('lista-historial').replaceChildren(...h.map(v=>{let el=document.createElement('div');el.className='item';el.textContent=v.producto_nombre+' ×'+v.cantidad+' — '+fmt(v.total)+' ('+v.fecha+')';return el}))}catch(e){status(e.message,true)}}
+function label(s){let x=document.createElement('span');x.textContent=s;return x}
+function makeButton(text,fn){let b=document.createElement('button');b.textContent=text;b.onclick=fn;return b}
+function renderVenta(){let q=$('buscar').value.toLocaleLowerCase();$('lista-venta').replaceChildren(...catalogo.filter(p=>p.nombre.toLocaleLowerCase().includes(q)).map(p=>{let row=document.createElement('div');row.className='item';row.append(label(p.nombre+' · '+fmt(p.precio)+' · Stock: '+p.stock),makeButton('Vender',()=>vender(p)));return row}))}
+function renderProductos(){$('lista-productos').replaceChildren(...catalogo.map(p=>{let row=document.createElement('div');row.className='item';row.append(label(p.nombre+' · '+fmt(p.precio)+' · '+p.stock+' unidades'+(p.stock_bajo?' ⚠️':'')),makeButton('+ Stock',()=>stock(p)));return row}))}
+async function vender(p){let c=prompt('Cantidad a vender de '+p.nombre,1);if(c===null)return;let n=Number(c);if(!Number.isSafeInteger(n)||n<1)return status('Cantidad inválida',true);if(!confirm('Vender '+n+' × '+p.nombre+' por '+fmt(n*Number(p.precio))+'?'))return;try{let r=await api('ventas',{method:'POST',body:JSON.stringify({producto_id:p.id,cantidad:n})});status('Venta #'+r.id+' registrada por '+fmt(r.total));await refresh()}catch(e){status(e.message,true)}}
+async function stock(p){let c=prompt('Unidades a agregar a '+p.nombre,1);if(c===null)return;let n=Number(c);if(!Number.isSafeInteger(n)||n<1)return status('Cantidad inválida',true);try{await api('productos/'+p.id+'/stock',{method:'POST',body:JSON.stringify({cantidad:n})});status('Stock actualizado');await refresh()}catch(e){status(e.message,true)}}
+$('form-producto').onsubmit=async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));data.stock=Number(data.stock);data.umbral_stock=Number(data.umbral_stock);try{await api('productos',{method:'POST',body:JSON.stringify(data)});e.target.reset();status('Producto registrado');await refresh()}catch(err){status(err.message,true)}};
+async function activarCamara(){try{let s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});$('camara').srcObject=s;$('camara').classList.remove('hidden');status('Cámara activa. Reconocimiento CNN aún no disponible.')}catch(e){status('No se pudo activar la cámara: '+e.message,true)}}
+function avisoCNN(){status('La CNN se integrará tras entrenar y validar el dataset de productos.',true)}
+refresh();
+</script></body></html>
