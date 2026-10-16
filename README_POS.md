@@ -43,3 +43,27 @@ Endpoints:
 El manifiesto ofrece rutas, IDs de producto y sesiones para una próxima fase de entrenamiento. **No entrena automáticamente** al cargar fotografías. Captura varias sesiones reales por producto con luz, fondos y ángulos diferentes. No mezclar imágenes de una misma sesión entre train/validación/test. La cámara no ejecuta reconocimiento todavía.
 
 Pruebas de esta fase: `python -m unittest discover -s tests -v`.
+
+## Fase 3: entrenar CNN propia (sin pesos preentrenados)
+
+Primero captura fotos de **al menos dos productos distintos**, desde **tres sesiones independientes por producto**. El mínimo técnico predeterminado del script es 30 fotografías por producto, pero para alcanzar una precisión útil se recomienda recolectar bastantes más y evaluar con fotografías tomadas en otro momento, iluminación y fondo.
+
+Instala las dependencias de aprendizaje profundo del proyecto anterior:
+
+```bash
+python -m pip install -r requirements.txt
+python -m cnn.entrenar --min-fotos 30 --min-sesiones 3 --epocas 40 --batch 16
+```
+
+Usa la base `datos/tienda.db` y las fotografías locales registradas en ella. Para usar otras rutas: `--db ruta/tienda.db --salida ruta/modelos`.
+
+El script:
+
+1. Comprueba cantidad de productos, fotos y sesiones.
+2. Separa **sesiones completas** en entrenamiento, validación y prueba.
+3. Construye una CNN propia (4 bloques Conv2D) con pesos inicializados desde cero.
+4. Aplica aumento de datos exclusivamente durante entrenamiento.
+5. Entrena con EarlyStopping y ReduceLROnPlateau.
+6. Evalúa el conjunto de prueba y guarda `modelo.keras`, `clases.json`, `metricas.json` en `datos/modelos/<version>/`.
+
+**Importante:** no publica el modelo automáticamente, no activa aún `/api/reconocer` y no simula resultados. Antes de usarlo para ventas, comprobar precisión sobre productos parecidos y la capacidad para rechazar imágenes de productos no registrados.
